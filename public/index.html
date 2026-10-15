@@ -66,7 +66,12 @@
       <div class="board">
         <div class="board-head">
           <h2>열린 토론회</h2>
-          <p id="lobby-stats" class="board-stats"></p>
+          <div class="board-tools">
+            <p id="lobby-stats" class="board-stats"></p>
+            <button id="btn-refresh" class="refresh" type="button" title="목록 새로고침" aria-label="목록 새로고침">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
         </div>
         <ul id="room-list" class="room-list"></ul>
         <p id="room-empty" class="board-empty" hidden>새 토론회를 준비하고 있어요…</p>

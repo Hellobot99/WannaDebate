@@ -139,12 +139,27 @@ socket.on('lobby', (data) => {
   renderLobby();
 });
 
+// 연결 상태: 끊기면 로비에 표시하고, 다시 붙으면 서버가 최신 목록을 보내 준다
+socket.on('disconnect', () => renderLobby());
+socket.on('connect', () => renderLobby());
+
+const refreshBtn = $('#btn-refresh');
+refreshBtn.onclick = () => {
+  refreshBtn.classList.remove('spin');
+  void refreshBtn.offsetWidth;
+  refreshBtn.classList.add('spin');
+  if (socket.connected) socket.emit('lobby:refresh');
+  else socket.connect();
+};
+
 function renderLobby() {
   const stats = $('#lobby-stats');
   stats.innerHTML = '';
   const dot = document.createElement('span');
-  dot.className = 'live';
-  stats.append(dot, document.createTextNode(`접속 ${lobby.online}명 · 토론 중 ${lobby.playing}판`));
+  dot.className = socket.connected ? 'live' : 'live down';
+  stats.append(dot, document.createTextNode(
+    socket.connected ? `접속 ${lobby.online}명 · 토론 중 ${lobby.playing}판` : '연결이 끊겼어요 · 다시 연결하는 중…'
+  ));
 
   const list = $('#room-list');
   list.innerHTML = '';
@@ -629,16 +644,23 @@ setInterval(() => {
 
 // ---------- 배경음악 버튼 ----------
 const musicBtn = $('#btn-music');
-function renderMusicBtn(on) {
-  musicBtn.setAttribute('aria-pressed', String(on));
-  musicBtn.classList.toggle('off', !on);
-  musicBtn.querySelector('span').textContent = on ? '음악 켜짐' : '음악 꺼짐';
+function renderMusicBtn(status) {
+  musicBtn.setAttribute('aria-pressed', String(status !== 'off'));
+  musicBtn.classList.toggle('off', status === 'off');
+  musicBtn.classList.toggle('blocked', status === 'blocked');
+  musicBtn.querySelector('span').textContent =
+    status === 'on' ? '음악 켜짐' : status === 'blocked' ? '탭하면 음악 재생' : '음악 꺼짐';
 }
 if (window.Music) {
-  renderMusicBtn(window.Music.isOn());
+  renderMusicBtn(window.Music.status());
   window.Music.onChange(renderMusicBtn);
   musicBtn.onclick = (e) => {
     e.stopPropagation();
+    // 소리가 막혀 있던 상태에서 누르면 끄지 말고 재생만 시작한다 (같은 클릭으로 이미 풀렸을 수 있다)
+    if (window.Music.status() === 'blocked' || window.Music.justUnlocked()) {
+      renderMusicBtn(window.Music.status());
+      return;
+    }
     window.Music.toggle();
   };
 } else {

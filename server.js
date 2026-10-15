@@ -206,7 +206,8 @@ function lobbyView() {
       category: r.topic.category ?? '자유',
       waitingName: r.players[0]?.name ?? null,
     })),
-    playing: [...rooms.values()].filter((r) => r.players.length === 2 && r.phase !== 'waiting').length,
+    // 결과 화면은 토론이 끝난 것으로 보고 세지 않는다
+    playing: [...rooms.values()].filter((r) => r.players.length === 2 && r.phase !== 'waiting' && r.phase !== 'result').length,
     online: io.engine.clientsCount,
   };
 }
@@ -399,6 +400,7 @@ async function runFinalReport(room) {
     room.gauge = { pro: report.pro, con: report.con, comment: '최종 판정 완료' };
     room.gaugeHistory.push({ n: room.turns.length, pro: report.pro, stage: 'final' });
     room.phase = 'result';
+    scheduleLobby(); // 로비의 "토론 중" 수를 바로 줄인다
   } catch (err) {
     if (room.matchId !== matchId) return;
     console.error('최종 판정 실패:', err.message ?? err);
@@ -595,6 +597,11 @@ io.on('connection', (socket) => {
     socket.join('lobby');
     socket.emit('left');
     socket.emit('lobby', lobbyView());
+  });
+
+  // 로비 새로고침 버튼: 목록은 바뀔 때마다 자동으로 오지만, 직접 다시 받아 볼 수도 있게
+  socket.on('lobby:refresh', () => {
+    if (!room) socket.emit('lobby', lobbyView());
   });
 
   socket.on('choose', (choice) => {

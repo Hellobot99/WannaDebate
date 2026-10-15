@@ -77,20 +77,33 @@
     current = { url, src, gain };
   }
 
+  let unlockedAt = 0; // 브라우저가 소리를 허락한 시각
+  const notify = () => {
+    if (ctx?.state === 'running' && !unlockedAt) unlockedAt = performance.now();
+    listeners.forEach((fn) => fn(window.Music.status()));
+  };
+
+  function init() {
+    if (ctx) return true;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return false;
+    // 아이폰은 무음 스위치를 켜면 웹 소리도 꺼지는데, "음악 재생"으로 알려 주면 그대로 난다 (지원하는 사파리만)
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
+    ctx = new AC();
+    master = ctx.createGain();
+    master.gain.value = VOLUME;
+    master.connect(ctx.destination);
+    ctx.onstatechange = notify;
+    // 지금 곡을 먼저, 나머지는 뒤에서 미리 받아 둔다
+    load(TRACKS[scene]).catch(() => {});
+    setTimeout(() => [...new Set([...Object.values(TRACKS), STING])].forEach((u) => load(u).catch(() => {})), 1500);
+    return true;
+  }
+
   function start() {
-    if (!enabled) return;
-    if (!ctx) {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return;
-      ctx = new AC();
-      master = ctx.createGain();
-      master.gain.value = VOLUME;
-      master.connect(ctx.destination);
-      // 지금 곡을 먼저, 나머지는 뒤에서 미리 받아 둔다
-      load(TRACKS[scene]).catch(() => {});
-      setTimeout(() => [...new Set([...Object.values(TRACKS), STING])].forEach((u) => load(u).catch(() => {})), 1500);
-    }
-    if (ctx.state !== 'running') ctx.resume();
+    if (!enabled || !init()) return;
+    // resume()은 사용자 입력 처리 중에 바로 불러야 허락받는다 (await 뒤에 부르면 막힐 수 있다)
+    if (ctx.state !== 'running') ctx.resume().then(notify, () => {});
     master.gain.cancelScheduledValues(ctx.currentTime);
     master.gain.setTargetAtTime(VOLUME, ctx.currentTime, 0.2);
     apply();
@@ -108,10 +121,14 @@
     }, 600);
   }
 
-  // 브라우저는 사용자가 한 번 클릭/입력하기 전엔 소리를 못 내게 하므로, 첫 입력에서 시작한다
+  // 브라우저는 사용자가 한 번 클릭/입력하기 전엔 소리를 못 내게 한다.
+  // 어떤 입력을 "허락"으로 치는지가 브라우저마다 달라서(사파리, 터치 기기 등) 여러 입력에서 모두 시도한다.
   const kick = () => { if (enabled && (!ctx || ctx.state !== 'running')) start(); };
-  window.addEventListener('pointerdown', kick, { passive: true });
-  window.addEventListener('keydown', kick);
+  for (const type of ['pointerdown', 'mousedown', 'pointerup', 'touchend', 'click', 'keydown']) {
+    window.addEventListener(type, kick, { passive: true, capture: true });
+  }
+  // 페이지가 열리자마자 준비해 둔다. 브라우저가 자동 재생을 허락하면 바로 나오고, 아니면 첫 입력에서 바로 시작된다.
+  if (enabled) start();
 
   window.Music = {
     setScene(name) {
@@ -142,9 +159,13 @@
       enabled = !enabled;
       try { localStorage.setItem(STORE_KEY, enabled ? 'on' : 'off'); } catch {}
       if (enabled) start(); else stop();
-      listeners.forEach((fn) => fn(enabled));
+      notify();
       return enabled;
     },
+    // 'on' 재생 중 · 'blocked' 켜져 있지만 브라우저가 아직 소리를 막는 중 · 'off' 꺼 둠
+    status: () => (!enabled ? 'off' : ctx?.state === 'running' ? 'on' : 'blocked'),
+    // 방금(같은 클릭 안에서) 소리가 풀렸는지. 그 클릭으로 음악을 끄지 않게 할 때 쓴다.
+    justUnlocked: () => unlockedAt > 0 && performance.now() - unlockedAt < 800,
     onChange(fn) { listeners.add(fn); },
     // 개발용: 디코딩된 음원 길이 확인
     async durations() {

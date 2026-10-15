@@ -1068,3 +1068,26 @@ textarea { resize: vertical; min-height: 110px; line-height: 1.6; }
 @media (max-width: 959px) {
   .app.in-debate .stage-banner { padding-right: 40px; }
 }
+.music-toggle.blocked { animation: pulse 1.6s ease-in-out infinite; }
+/* 소리가 막혀 있을 땐 토론 중 휴대폰에서도 안내 글자를 보여 준다 */
+body:has(.app.in-debate) .music-toggle.blocked span { display: inline; }
+
+/* 로비 새로고침 · 연결 상태 */
+.board-tools { display: flex; align-items: center; gap: 8px; }
+.board-stats .live.down { background: var(--con); box-shadow: 0 0 8px var(--con); animation: pulse 1s infinite; }
+.refresh {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid #6b5626;
+  background: transparent;
+  color: var(--gold-hi);
+  cursor: pointer;
+}
+.refresh:hover { background: var(--gold-soft); }
+.refresh .icon { width: 15px; height: 15px; }
+.refresh.spin .icon { animation: spin 0.6s ease-out; }
+/* 휴대폰에서 음악 버튼이 간판 글자와 겹치지 않게 */
+@media (max-width: 600px) { .marquee { padding-top: 30px; } }
