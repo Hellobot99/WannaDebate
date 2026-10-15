@@ -1,0 +1,16 @@
+# Render Blueprint: 대시보드에서 New → Blueprint로 이 저장소를 고르면 아래 설정으로 배포된다.
+services:
+  - type: web
+    name: wannadebate
+    runtime: node
+    region: singapore # 한국에서 가까운 지역
+    plan: free # 무료는 15분간 접속이 없으면 잠든다. 계속 켜 두려면 starter 이상으로
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true # main에 푸시하면 자동으로 다시 배포
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false # 값은 배포할 때 대시보드에서 직접 입력 (저장소에 넣지 않는다)
+      - key: TRUST_PROXY
+        value: "1" # Render 프록시 뒤에서 실제 사용자 IP로 방 생성 제한을 건다

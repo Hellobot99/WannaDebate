@@ -39,6 +39,8 @@ const STEPS = [
 
 const app = express();
 app.use(express.static('public'));
+// 배포 서비스가 서버가 살아 있는지 확인하는 주소
+app.get('/healthz', (_req, res) => res.json({ ok: true, rooms: rooms.size }));
 const httpServer = createServer(app);
 const io = new Server(httpServer, { maxHttpBufferSize: 16 * 1024 });
 
