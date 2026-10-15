@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>토론함뜰래? · Wanna Debate?</title>
+  <meta name="description" content="AI가 논제를 던지고 심판을 보는 2인 토론 게임">
+  <meta name="theme-color" content="#0d1222">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&display=swap">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 아이콘 모음 -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3" fill="currentColor"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v17M7 21h10M4 7h16M4 7l-3 7a3 3 0 0 0 6 0zM20 7l-3 7a3 3 0 0 0 6 0z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-gavel" viewBox="0 0 24 24"><path d="M13.5 3.5l7 7M10.5 6.5l7 7M12 5l5 5M3 21l8.5-8.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M2 22h9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+  </svg>
+
+  <button id="btn-music" class="music-toggle" type="button" aria-pressed="true" title="배경음악 켜기/끄기">
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" fill="currentColor"/><circle cx="17" cy="16" r="3" fill="currentColor"/></svg>
+    <span>음악 켜짐</span>
+  </button>
+
+  <main class="app">
+    <header class="marquee" id="marquee">
+      <p class="marquee-sub">AI 심판 토론회</p>
+      <h1>토론함뜰래?</h1>
+      <p class="marquee-en">WANNA DEBATE?</p>
+    </header>
+
+    <div id="mock-banner" class="banner" hidden>테스트 모드: GEMINI_API_KEY가 없어 가짜 AI 응답을 씁니다.</div>
+
+    <!-- 로비: 입장권(이름 + 매칭) + 열린 토론회 목록 -->
+    <section id="screen-lobby" class="screen lobby">
+      <div class="lobby-side">
+        <div class="ticket">
+          <div class="ticket-main">
+            <p class="ticket-kicker">ADMIT TWO · 2인 토론</p>
+            <p class="ticket-lead">논제를 골라 들어가면 상대가 맞붙는다.<br>한마디마다 움직이는 판세, 끝나면 판정서까지.</p>
+            <label class="field">
+              <span>토론자 이름</span>
+              <input id="name" maxlength="12" placeholder="예: 논리왕" autocomplete="nickname" aria-describedby="name-hint">
+              <span id="name-hint" class="name-hint" aria-live="polite"></span>
+            </label>
+            <div id="join-invite" class="invite" hidden>
+              <p><b id="invite-code"></b> 토론회에 초대받았어요.</p>
+              <button id="btn-join-invite" class="btn gold wide">입장하기</button>
+            </div>
+            <button id="btn-quick" class="btn gold wide">랜덤 매칭</button>
+            <button id="btn-create" class="btn ghost wide">비공개방 만들기</button>
+            <div class="divider"><span>초대 코드가 있다면</span></div>
+            <div class="row">
+              <input id="code" class="code-input" maxlength="5" placeholder="코드 5자리" autocapitalize="characters">
+              <button id="btn-join" class="btn ghost">입장</button>
+            </div>
+            <p id="lobby-error" class="error" hidden></p>
+          </div>
+          <div class="ticket-stub" aria-hidden="true"><span>입론</span><span>자유토론</span><span>최종 변론</span></div>
+        </div>
+      </div>
+
+      <div class="board">
+        <div class="board-head">
+          <h2>열린 토론회</h2>
+          <p id="lobby-stats" class="board-stats"></p>
+        </div>
+        <ul id="room-list" class="room-list"></ul>
+        <p id="room-empty" class="board-empty" hidden>새 토론회를 준비하고 있어요…</p>
+      </div>
+    </section>
+
+    <!-- 대기실 -->
+    <section id="screen-waiting" class="screen" hidden>
+      <div class="hall-card center">
+        <p class="kicker">대기실</p>
+        <div id="waiting-public" hidden>
+          <p class="muted">공개 토론회 · 상대가 들어오면 바로 시작합니다</p>
+          <div class="banner-topic small">
+            <p class="kicker" id="waiting-category"></p>
+            <h2 class="topic-title" id="waiting-title"></h2>
+            <p class="topic-bg" id="waiting-bg"></p>
+          </div>
+        </div>
+        <div id="waiting-private" hidden>
+          <p class="muted">비공개 토론회 · 상대 토론자에게 이 코드를 알려 주세요</p>
+          <p id="room-code" class="room-code"></p>
+          <button id="btn-copy" class="btn gold">초대 링크 복사</button>
+        </div>
+        <p class="muted pulse">상대 토론자를 기다리는 중…</p>
+        <button id="btn-leave-waiting" class="btn ghost-dark">로비로 나가기</button>
+      </div>
+    </section>
+
+    <!-- 논제 선정 중 -->
+    <section id="screen-topic" class="screen" hidden>
+      <div class="hall-card center">
+        <svg class="icon-lg spin-slow"><use href="#i-scale"/></svg>
+        <p class="kicker">사회자</p>
+        <p>오늘의 논제를 고르고 있습니다…</p>
+      </div>
+    </section>
+
+    <!-- 진영 선택 -->
+    <section id="screen-choosing" class="screen" hidden>
+      <div class="banner-topic">
+        <p class="kicker">오늘의 논제</p>
+        <h2 class="topic-title"></h2>
+        <p class="topic-bg"></p>
+      </div>
+      <p class="center prompt">어느 쪽 연단에 서시겠습니까?</p>
+      <div class="choices">
+        <button class="choice pro" data-choice="pro">
+          <span class="choice-side">찬성</span>
+          <span class="hint" data-hint="pro"></span>
+          <span class="choice-cta">찬성석에 서기</span>
+        </button>
+        <button class="choice con" data-choice="con">
+          <span class="choice-side">반대</span>
+          <span class="hint" data-hint="con"></span>
+          <span class="choice-cta">반대석에 서기</span>
+        </button>
+      </div>
+      <p id="choose-status" class="muted center"></p>
+    </section>
+
+    <!-- 코인토스 -->
+    <section id="screen-coin" class="screen" hidden>
+      <div class="hall-card center">
+        <p class="kicker">사회자 · 진영 추첨</p>
+        <p id="coin-intro"></p>
+        <div class="coin-stage"><div id="coin" class="coin"><div class="face front">찬</div><div class="face back">반</div></div></div>
+        <p id="coin-result" class="coin-result"></p>
+      </div>
+    </section>
+
+    <!-- 토론장 -->
+    <section id="screen-debate" class="screen debate" hidden>
+      <div class="col-main">
+        <div class="stage">
+          <div class="stage-banner">
+            <span class="kicker">논제</span>
+            <p class="topic-mini"></p>
+          </div>
+
+          <div class="scoreboard">
+            <div class="score-side pro"><span class="score-label">찬성</span><span class="score-num pro-num">50</span></div>
+            <div class="gauge" role="meter" aria-label="찬성 우세 점수" aria-valuemin="0" aria-valuemax="100">
+              <div class="gauge-pro"></div>
+              <div class="gauge-con"></div>
+              <div class="gauge-mid"></div>
+            </div>
+            <div class="score-side con"><span class="score-num con-num">50</span><span class="score-label">반대</span></div>
+          </div>
+
+          <div class="floor">
+            <div class="podium pro" id="podium-pro">
+              <div class="spotlight"></div>
+              <div class="podium-status"><svg class="icon"><use href="#i-mic"/></svg><span></span></div>
+              <div class="lectern">
+                <span class="plate-side">찬성</span>
+                <span class="plate-name pro-name"></span>
+              </div>
+            </div>
+
+            <div class="judge">
+              <div class="judge-seat"><svg class="icon"><use href="#i-scale"/></svg><span>AI 심판</span></div>
+              <p class="gauge-comment"></p>
+            </div>
+
+            <div class="podium con" id="podium-con">
+              <div class="spotlight"></div>
+              <div class="podium-status"><svg class="icon"><use href="#i-mic"/></svg><span></span></div>
+              <div class="lectern">
+                <span class="plate-side">반대</span>
+                <span class="plate-name con-name"></span>
+              </div>
+            </div>
+          </div>
+
+          <div id="debate-live" class="clockbar">
+            <ol class="steps">
+              <li data-stage="opening">입론</li>
+              <li data-stage="free">자유토론</li>
+              <li data-stage="closing">최종 변론</li>
+            </ol>
+            <span id="timer" class="clock-time">--:--</span>
+            <span id="turn-label" class="sr-only" aria-live="polite"></span>
+            <div class="timer-bar"><div id="timer-fill"></div></div>
+          </div>
+        </div>
+
+        <form id="speak-form" class="speak" hidden>
+          <div class="speak-head"><svg class="icon"><use href="#i-mic"/></svg><span>마이크가 켜졌습니다</span></div>
+          <textarea id="speech" maxlength="1000" rows="4" placeholder="내 주장을 써 주세요"></textarea>
+          <div class="speak-foot">
+            <span id="count" class="muted">0 / 1000</span>
+            <button class="btn gold" type="submit">발언하기</button>
+          </div>
+        </form>
+        <p id="wait-turn" class="wait-turn pulse" hidden></p>
+
+        <div id="judging" class="hall-card center" hidden>
+          <svg class="icon-lg knock"><use href="#i-gavel"/></svg>
+          <p class="kicker">심판</p>
+          <p>판정서를 작성하고 있습니다…</p>
+        </div>
+
+        <!-- 판정서 -->
+        <article id="result" class="verdict" hidden>
+          <header class="verdict-head">
+            <p class="verdict-org">토론함뜰래? 토론회</p>
+            <h2>판 정 서</h2>
+          </header>
+
+          <dl class="verdict-meta">
+            <dt>논제</dt><dd id="v-topic"></dd>
+            <dt>찬성</dt><dd id="v-pro"></dd>
+            <dt>반대</dt><dd id="v-con"></dd>
+          </dl>
+
+          <section class="verdict-order">
+            <h3>주 문</h3>
+            <p id="winner-title"></p>
+            <p id="final-score" class="final-score"></p>
+            <div id="stamp" class="stamp" aria-hidden="true">승</div>
+          </section>
+
+          <section><h3>판정 이유</h3><p id="r-score"></p></section>
+          <section><h3 id="r-win-title">승패를 가른 점</h3><p id="r-win"></p></section>
+          <section>
+            <h3>판세의 흐름</h3>
+            <div id="history-chart"></div>
+          </section>
+          <section class="grid2">
+            <div class="side-pro"><h3>찬성 측 요지</h3><ol id="r-pro"></ol></div>
+            <div class="side-con"><h3>반대 측 요지</h3><ol id="r-con"></ol></div>
+          </section>
+          <section><h3>심판의 조언</h3><div id="r-tips"></div></section>
+          <section><h3>양측이 다루지 않은 쟁점</h3><ol id="r-missed"></ol></section>
+
+          <footer class="verdict-sign">
+            <span id="v-date"></span>
+            <span class="sign">심판 <b>AI</b> <span class="seal">印</span></span>
+          </footer>
+        </article>
+        <div id="result-actions" class="result-actions" hidden>
+          <button id="btn-rematch" class="btn gold">새 논제로 한 판 더</button>
+          <button id="btn-leave-result" class="btn ghost-dark">로비로</button>
+        </div>
+      </div>
+
+      <aside class="col-minutes" aria-label="속기록">
+        <div class="minutes">
+          <div class="minutes-head">
+            <span>속 기 록</span>
+            <span class="minutes-sub">토론함뜰래? 토론회</span>
+          </div>
+          <div class="log-scroll" id="log-scroll">
+            <ol id="log" class="log"></ol>
+            <p id="log-empty" class="log-empty">아직 발언이 없습니다. 찬성 측 입론으로 토론을 시작합니다.</p>
+          </div>
+          <button id="jump-latest" class="jump" type="button" hidden>새 발언 보기 ↓</button>
+        </div>
+      </aside>
+    </section>
+
+    <div id="error-box" class="hall-card center error-box" hidden>
+      <p id="error-msg"></p>
+      <button id="btn-retry" class="btn gold">다시 시도</button>
+    </div>
+
+    <p id="opponent-left" class="toast" hidden>상대 토론자가 자리를 비웠어요. 돌아오길 기다리는 중…</p>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="music.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
