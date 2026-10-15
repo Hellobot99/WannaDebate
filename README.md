@@ -49,7 +49,8 @@ npm start              # http://localhost:3000
 | `OPENING_SECONDS` | `90` | 입론 한 턴 제한 시간(초) |
 | `FREE_SECONDS` | `180` | 자유토론 시간(초) |
 | `CLOSING_SECONDS` | `60` | 최종 변론 한 턴 제한 시간(초) |
-| `OPEN_ROOMS` | `6` | 로비에 늘 열어 두는 공개 토론회 수 |
+| `OPEN_ROOMS` | `6` | 로비에 늘 열어 두는 공개 토론회 수 (분야가 겹치지 않게 채움) |
+| `TOPIC_STALE_MINUTES` | `10` | 아무도 안 들어간 빈 공개방을 새 주제로 바꾸는 시간(분). 로비에 사람이 있을 때만, 1분에 한 방씩 |
 | `NAME_GRACE_SECONDS` | `15` | 창을 닫은 뒤 닉네임을 풀어 주기까지 기다리는 시간(초) |
 | `MAX_ROOMS` | `200` | 동시에 열 수 있는 방 수 |
 | `CREATE_LIMIT` | `5` | IP당 10분에 만들 수 있는 비공개방 수 |

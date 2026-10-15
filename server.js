@@ -21,6 +21,8 @@ const ROOM_TTL_MS = 10 * 60 * 1000;
 
 // 로비에 늘 열어 두는 공개 토론회 수 (빈 방 + 한 명이 기다리는 방)
 const OPEN_ROOMS = env('OPEN_ROOMS', 6);
+// 아무도 안 들어간 빈 공개방은 이 시간이 지나면 새 주제로 바꾼다 (로비를 보는 사람이 있을 때만)
+const TOPIC_STALE_MS = env('TOPIC_STALE_MINUTES', 10) * 60 * 1000;
 
 // 남용 방지: 방 개수 상한, IP당 비공개방 생성 속도
 const MAX_ROOMS = env('MAX_ROOMS', 200);
@@ -222,6 +224,7 @@ function scheduleLobby() {
 }
 
 let opening = 0; // 지금 만들고 있는 공개방 수 (동시에 너무 많이 만들지 않게)
+
 async function ensureOpenRooms() {
   const open = [...rooms.values()].filter(isOpenPublic);
   // 사람이 나가서 빈 방이 남아돌면 정리한다
@@ -229,21 +232,40 @@ async function ensureOpenRooms() {
   for (const r of empties.slice(0, Math.max(0, open.length - OPEN_ROOMS - 2))) deleteRoom(r, false);
 
   const need = OPEN_ROOMS - open.length - opening;
-  for (let i = 0; i < need && rooms.size < MAX_ROOMS; i++) {
-    opening += 1;
-    takeTopic()
-      .then((topic) => {
-        const code = newCode();
-        rooms.set(code, newRoom(code, 'public', topic));
-        scheduleLobby();
-      })
-      .catch((err) => console.error('공개방 생성 실패:', err))
-      .finally(() => (opening -= 1));
+  if (need <= 0) return;
+  opening += need;
+  // 한 개씩 차례로 만들면서, 지금 로비에 없는 분야부터 채운다
+  for (let i = 0; i < need; i++) {
+    try {
+      if (rooms.size >= MAX_ROOMS) continue;
+      const shown = [...rooms.values()].filter(isOpenPublic).map((r) => r.topic.category);
+      const topic = await takeTopic(shown);
+      const code = newCode();
+      rooms.set(code, newRoom(code, 'public', topic));
+      scheduleLobby();
+    } catch (err) {
+      console.error('공개방 생성 실패:', err);
+    } finally {
+      opening -= 1;
+    }
   }
 }
 
+// 오래 아무도 안 들어간 빈 방을 하나씩 새 주제로 교체한다.
+// 한 번에 다 바꾸지 않고 1분에 하나씩 바꿔서 목록이 갑자기 통째로 바뀌지 않게 하고,
+// 로비를 보는 사람이 없으면 바꾸지 않는다 (볼 사람이 없는데 주제를 만들 필요가 없으니까).
+function rotateStaleRooms() {
+  const watchers = io.sockets.adapter.rooms.get('lobby')?.size ?? 0;
+  if (!watchers) return;
+  const now = Date.now();
+  const stale = [...rooms.values()]
+    .filter((r) => isOpenPublic(r) && r.players.length === 0 && now - r.idleSince > TOPIC_STALE_MS)
+    .sort((a, b) => a.idleSince - b.idleSince);
+  if (stale.length) deleteRoom(stale[0]); // deleteRoom이 ensureOpenRooms로 새 방을 채운다
+}
+
 function newRoom(code, visibility, topic = null) {
-  return { code, visibility, players: [], phase: 'waiting', topic, rematch: new Set(), createdAt: Date.now() };
+  return { code, visibility, players: [], phase: 'waiting', topic, rematch: new Set(), createdAt: Date.now(), idleSince: Date.now() };
 }
 
 function deleteRoom(room, refill = true) {
@@ -255,6 +277,7 @@ function deleteRoom(room, refill = true) {
 }
 
 setInterval(ensureOpenRooms, 30 * 1000).unref();
+setInterval(rotateStaleRooms, 60 * 1000).unref();
 
 function resolveSides(room) {
   const [a, b] = room.players;
@@ -546,6 +569,7 @@ io.on('connection', (socket) => {
     if (r.players.length === 0 && (r.visibility === 'private' || r.phase !== 'waiting')) {
       deleteRoom(r);
     } else {
+      if (r.players.length === 0) r.idleSince = Date.now(); // 누가 잠깐 들어왔다 나간 방은 다시 처음부터 센다
       broadcast(r);
       scheduleLobby();
     }

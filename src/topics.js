@@ -80,10 +80,34 @@ async function refill() {
   return refilling;
 }
 
-/** 주제를 하나 꺼낸다. 풀이 비었으면 채울 때까지 기다리고, 꺼낸 뒤 줄었으면 미리 채워 둔다. */
-export async function takeTopic() {
+/**
+ * 주제를 하나 꺼낸다. 풀이 비었으면 채울 때까지 기다리고, 꺼낸 뒤 줄었으면 미리 채워 둔다.
+ * @param {string[]} avoidCategories 지금 로비에 이미 보이는 분야. 가능하면 다른 분야의 주제를 고른다.
+ */
+export async function takeTopic(avoidCategories = []) {
   if (!pool.length) await refill();
-  const topic = pool.shift() ?? fallbackTopic();
+  const avoid = new Set(avoidCategories);
+  let index = pool.findIndex((t) => !avoid.has(t.category));
+  if (index < 0 && pool.length && avoid.size) {
+    // 풀에 다른 분야가 없으면, 아직 로비에 없는 분야로 바로 하나 만들어 본다
+    const missing = Object.keys(CATEGORIES).filter((c) => !avoid.has(c));
+    if (missing.length && !mockMode) {
+      try {
+        const category = pick(missing);
+        const [made] = await generateTopics([{ category, keyword: pick(CATEGORIES[category]) }], recent.slice(-30));
+        if (made?.title && !recent.includes(made.title)) {
+          remember(made.title);
+          return made;
+        }
+      } catch {}
+    }
+    const fb = FALLBACK.find((t) => !avoid.has(t.category) && !recent.includes(t.title));
+    if (fb) {
+      remember(fb.title);
+      return { ...fb };
+    }
+  }
+  const topic = (index >= 0 ? pool.splice(index, 1)[0] : pool.shift()) ?? fallbackTopic();
   remember(topic.title);
   if (pool.length < REFILL_BELOW) refill();
   return topic;
