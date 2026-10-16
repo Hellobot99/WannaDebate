@@ -642,27 +642,61 @@ setInterval(() => {
   $('#timer-fill').style.width = `${(left / (state.current.seconds * 1000)) * 100}%`;
 }, 250);
 
-// ---------- 배경음악 버튼 ----------
+// ---------- 배경음악 버튼 + 볼륨 패널 ----------
 const musicBtn = $('#btn-music');
+const musicPanel = $('#music-panel');
+const musicSwitch = $('#music-onoff');
+const volumeInput = $('#music-volume');
+const volumeVal = $('#music-volume-val');
+
 function renderMusicBtn(status) {
-  musicBtn.setAttribute('aria-pressed', String(status !== 'off'));
   musicBtn.classList.toggle('off', status === 'off');
   musicBtn.classList.toggle('blocked', status === 'blocked');
   musicBtn.querySelector('span').textContent =
     status === 'on' ? '음악 켜짐' : status === 'blocked' ? '탭하면 음악 재생' : '음악 꺼짐';
+  musicSwitch.setAttribute('aria-checked', String(status !== 'off'));
 }
+function renderVolume() {
+  const v = Math.round(window.Music.getVolume() * 100);
+  volumeInput.value = v;
+  volumeVal.textContent = `${v}%`;
+  volumeInput.style.setProperty('--fill', `${v}%`);
+}
+function setPanel(open) {
+  musicPanel.hidden = !open;
+  musicBtn.setAttribute('aria-expanded', String(open));
+}
+
 if (window.Music) {
   renderMusicBtn(window.Music.status());
+  renderVolume();
   window.Music.onChange(renderMusicBtn);
+
+  // 버튼은 설정 패널을 열고 닫는다. 이 클릭으로 막혀 있던 소리도 함께 풀린다(music.js가 첫 입력에서 재생 시작).
   musicBtn.onclick = (e) => {
     e.stopPropagation();
-    // 소리가 막혀 있던 상태에서 누르면 끄지 말고 재생만 시작한다 (같은 클릭으로 이미 풀렸을 수 있다)
-    if (window.Music.status() === 'blocked' || window.Music.justUnlocked()) {
-      renderMusicBtn(window.Music.status());
-      return;
-    }
+    setPanel(musicPanel.hidden);
+  };
+  musicSwitch.onclick = (e) => {
+    e.stopPropagation();
     window.Music.toggle();
   };
+  volumeInput.addEventListener('input', () => {
+    window.Music.setVolume(volumeInput.value / 100);
+    // 꺼 둔 상태에서 볼륨을 올리면 다시 켠다
+    if (!window.Music.isOn() && volumeInput.value > 0) window.Music.toggle();
+    renderVolume();
+  });
+  // 패널 밖을 누르거나 Esc를 누르면 닫는다
+  document.addEventListener('click', (e) => {
+    if (!musicPanel.hidden && !$('#music-ctl').contains(e.target)) setPanel(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !musicPanel.hidden) {
+      setPanel(false);
+      musicBtn.focus();
+    }
+  });
 } else {
-  musicBtn.hidden = true;
+  $('#music-ctl').hidden = true;
 }

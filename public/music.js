@@ -10,7 +10,17 @@
     judging: 'audio/final.mp3',
   };
   const STING = 'audio/end.mp3'; // 판정서 공개 효과음 (한 번만)
-  const VOLUME = 0.4; // 음원이 노래 음량으로 마스터링되어 있어서 배경음악으로 낮춘다
+  // 음원이 노래 음량으로 마스터링되어 있어서 최대도 낮게 잡는다.
+  // 슬라이더 값(0~1)을 제곱해서 써야 귀로 듣기에 고르게 커진다. 기본 0.8 ≈ 예전 고정 음량(0.4)
+  const MAX_GAIN = 0.62;
+  const VOLUME_KEY = 'wd-music-volume';
+  let volume = (() => {
+    try {
+      const v = parseFloat(localStorage.getItem(VOLUME_KEY));
+      return Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0.8;
+    } catch { return 0.8; }
+  })();
+  const level = () => MAX_GAIN * volume * volume;
   const FADE = 1.2; // 곡 전환 시간(초)
 
   const STORE_KEY = 'wd-music';
@@ -91,7 +101,7 @@
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
     ctx = new AC();
     master = ctx.createGain();
-    master.gain.value = VOLUME;
+    master.gain.value = level();
     master.connect(ctx.destination);
     ctx.onstatechange = notify;
     // 지금 곡을 먼저, 나머지는 뒤에서 미리 받아 둔다
@@ -105,7 +115,7 @@
     // resume()은 사용자 입력 처리 중에 바로 불러야 허락받는다 (await 뒤에 부르면 막힐 수 있다)
     if (ctx.state !== 'running') ctx.resume().then(notify, () => {});
     master.gain.cancelScheduledValues(ctx.currentTime);
-    master.gain.setTargetAtTime(VOLUME, ctx.currentTime, 0.2);
+    master.gain.setTargetAtTime(level(), ctx.currentTime, 0.2);
     apply();
   }
 
@@ -155,6 +165,16 @@
       setTimeout(apply, (buffer.duration - 1) * 1000 + 50);
     },
     isOn: () => enabled,
+    getVolume: () => volume,
+    /** 볼륨 0~1. 저장해 두고, 재생 중이면 바로 반영한다. */
+    setVolume(v) {
+      volume = Math.min(1, Math.max(0, Number(v) || 0));
+      try { localStorage.setItem(VOLUME_KEY, String(volume)); } catch {}
+      if (ctx && enabled) {
+        master.gain.cancelScheduledValues(ctx.currentTime);
+        master.gain.setTargetAtTime(level(), ctx.currentTime, 0.05);
+      }
+    },
     toggle() {
       enabled = !enabled;
       try { localStorage.setItem(STORE_KEY, enabled ? 'on' : 'off'); } catch {}

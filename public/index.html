@@ -20,10 +20,23 @@
     <symbol id="i-gavel" viewBox="0 0 24 24"><path d="M13.5 3.5l7 7M10.5 6.5l7 7M12 5l5 5M3 21l8.5-8.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M2 22h9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
   </svg>
 
-  <button id="btn-music" class="music-toggle" type="button" aria-pressed="true" title="배경음악 켜기/끄기">
-    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" fill="currentColor"/><circle cx="17" cy="16" r="3" fill="currentColor"/></svg>
-    <span>음악 켜짐</span>
-  </button>
+  <div class="music-ctl" id="music-ctl">
+    <button id="btn-music" class="music-toggle" type="button" aria-expanded="false" aria-controls="music-panel" title="배경음악 설정">
+      <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6" cy="18" r="3" fill="currentColor"/><circle cx="17" cy="16" r="3" fill="currentColor"/></svg>
+      <span>음악 켜짐</span>
+    </button>
+    <div id="music-panel" class="music-panel" hidden>
+      <div class="music-panel-head">
+        <span>배경음악</span>
+        <button id="music-onoff" class="switch" type="button" role="switch" aria-checked="true" aria-label="배경음악 켜기/끄기"><span></span></button>
+      </div>
+      <label class="volume">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input id="music-volume" type="range" min="0" max="100" step="1" aria-label="배경음악 볼륨">
+        <output id="music-volume-val" for="music-volume">80%</output>
+      </label>
+    </div>
+  </div>
 
   <main class="app">
     <header class="marquee" id="marquee">
